@@ -132,8 +132,8 @@ static operators get_operator(token_type_e type) {
 }
 
 node_body* parse_body(parser_context* parser) {
-    consume(parser, TOKEN_BRACE_OPEN);
     node_body* body = new_node_body(parser);
+    body->loc = consume(parser, TOKEN_BRACE_OPEN).loc;
 
     while (!at(parser, TOKEN_BRACE_CLOSE)) {
         node* stmt = parse_statement(parser, 1);
@@ -149,6 +149,7 @@ node_body* parse_body(parser_context* parser) {
 node_literal* parse_literal(parser_context* parser) {
     node_literal* literal = new_node_literal(parser);
     literal->value = copy_string(parser, current(parser).data);
+    literal->loc = current(parser).loc;
     step(parser, 1);
     return literal;
 }
@@ -157,6 +158,7 @@ node_identifier* parse_identifier(parser_context* parser)  {
     node_identifier* identifier = new_node_identifier(parser);
 
     token_t name_token = consume(parser, TOKEN_ID);
+    identifier->loc = name_token.loc;
     identifier->name = copy_string(parser, name_token.data);
 
     if(at(parser, TOKEN_PACKAGE_ACCESS)) {
@@ -198,8 +200,8 @@ node_identifier* parse_identifier(parser_context* parser)  {
 }
 
 node_package_def* parse_package(parser_context* parser) {
-    consume(parser, TOKEN_KW_PACKAGE);
     node_package_def* package = new_node_package_def(parser);
+    package->loc = consume(parser, TOKEN_KW_PACKAGE).loc;
 
     token_t name_token = consume(parser, TOKEN_ID);
     package->package_name = copy_string(parser, name_token.data);
@@ -208,8 +210,8 @@ node_package_def* parse_package(parser_context* parser) {
 }
 
 node_use_def* parse_package_use(parser_context* parser) {
-    consume(parser, TOKEN_KW_USE);
     node_use_def* package = new_node_use_def(parser);
+    package->loc = consume(parser, TOKEN_KW_USE).loc;
 
     token_t name_token = consume(parser, TOKEN_ID);
     package->package_name = copy_string(parser, name_token.data);
@@ -224,7 +226,7 @@ node* parse_variable_definition(parser_context* parser, permissions perms) {
     // The structure is:
     // [modifiers] var [name] (-> [type]) (<- [statement]);
     // Modifiers is handled in the preceding step.
-    consume(parser, TOKEN_KW_VAR);
+    variable_def->loc = consume(parser, TOKEN_KW_VAR).loc;
     variable_def->name = copy_string(parser, consume(parser, TOKEN_ID).data);
 
     if(at(parser, TOKEN_ACCESS)) {
@@ -254,7 +256,7 @@ node* parse_function_definition(parser_context* parser, permissions perms) {
     // Then either { [body] } or a semicolon, depending on the function declaration.
     // Modifiers are already handled.
     // No return type means it's a void.
-    consume(parser, TOKEN_KW_FUNCTION);
+    function_def->loc = consume(parser, TOKEN_KW_FUNCTION).loc;
 
     // [name]
     function_def->name = copy_string(parser, consume(parser, TOKEN_ID).data);
@@ -311,7 +313,7 @@ node* parse_class_definition(parser_context* parser, permissions perms) {
     // Structure:
     // [modifiers] class [name]{[generics]} { ... }
 
-    consume(parser, TOKEN_KW_CLASS);
+    class_def->loc = consume(parser, TOKEN_KW_CLASS).loc;
 
     class_def->name = copy_string(parser, consume(parser, TOKEN_ID).data);
 
@@ -343,7 +345,7 @@ node* parse_struct_definition(parser_context* parser, permissions perms) {
     struct_def->flags = perms;
 
     // Structs are like low-level classes.
-    consume(parser, TOKEN_KW_STRUCT);
+    struct_def->loc = consume(parser, TOKEN_KW_STRUCT).loc;
     struct_def->name = copy_string(parser, consume(parser, TOKEN_ID).data);
     struct_def->body = parse_body(parser);
 
@@ -406,6 +408,8 @@ static node_function_call* parse_function_call(parser_context* parser, node_iden
     node_function_call* call = new_node_function_call(parser);
 
     call->target = identifier;
+    call->loc = identifier->loc;
+
     consume(parser, TOKEN_PARENTHESIS_OPEN);
 
     if(!at(parser, TOKEN_PARENTHESIS_CLOSE)) {
@@ -481,6 +485,7 @@ static node* parse_binary_expression(parser_context* parser, int parent_preceden
         left = parse_primary_expression(parser);
 
         // TODO: Expanded primary expressions
+        // ???? what did I mean with this?
     }
 
     // Time for magic
@@ -509,7 +514,7 @@ static node* parse_binary_expression(parser_context* parser, int parent_preceden
 
 static node_make* parse_make(parser_context* parser) {
     node_make* make = new_node_make(parser);
-    consume(parser, TOKEN_KW_MAKE);
+    make->loc = consume(parser, TOKEN_KW_MAKE).loc;
 
     make->target = parse_identifier(parser);
 
@@ -532,7 +537,7 @@ static node_make* parse_make(parser_context* parser) {
 static node_return* parse_return(parser_context* parser) {
     node_return* return_stmt = new_node_return(parser);
 
-    consume(parser, TOKEN_KW_RETURN);
+    return_stmt->loc = consume(parser, TOKEN_KW_RETURN).loc;
 
     return_stmt->value = parse_expression(parser);
 
@@ -542,7 +547,7 @@ static node_return* parse_return(parser_context* parser) {
 static node_while* parse_while(parser_context* parser) {
     node_while* statement = new_node_while(parser);
 
-    consume(parser, TOKEN_KW_WHILE);
+    statement->loc = consume(parser, TOKEN_KW_WHILE).loc;
 
     consume(parser, TOKEN_PARENTHESIS_OPEN);
     statement->condition = parse_expression(parser);
@@ -564,7 +569,7 @@ static node_if* parse_if(parser_context* parser) {
 
     // if([stmt]) { [...] } else if([stmt]) { [...] } else { [...] }
 
-    consume(parser, TOKEN_KW_IF);
+    statement->loc = consume(parser, TOKEN_KW_IF).loc;
 
     consume(parser, TOKEN_PARENTHESIS_OPEN);
     statement->condition = parse_expression(parser);

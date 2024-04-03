@@ -18,5 +18,5 @@ typedef struct binder_context {
 
 binder_context* binder_create(bind_ext_resolver resolver);
 void binder_mount(binder_context* binder, node_root* program_node, string filename);
-void binder_validate(binder_context* binder);
+int binder_validate(binder_context* binder);
 void binder_destroy(binder_context* binder);

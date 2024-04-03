@@ -4,6 +4,7 @@
 #include <binder/binder.h>
 #include <string.h>
 #include <stdlib.h>
+#include "util/log.h"
 
 void throw_exceptions() {
     int error_count = enumerate_errors(NULL);
@@ -66,24 +67,21 @@ bind_ext_access_level level_fetch(bind_ext_object object) {
 bind_ext_object get_package(char* name) {
     if(strcmp(name, "sys") == 0)
         return 1;
-    printf("Invalid package '%s!'\n", name);
+    lprintf("Invalid package '%s!'\n", name);
     return 0;
 }
 
-int main() {
+parser_context* parse_file(FILE* in) {
     lexer_context* lexer = lexer_create();
-
-    FILE* in = fopen("src/r_test/test_simple.rct", "r");
     lexer_read(lexer, in);
-    fclose(in);
 
     lexer_process(lexer);
 
-    printf("Tokens:\n");
+    lprintf("Tokens:\n");
     for (int i = 0; i < lexer->token_count; ++i) {
-        printf("| [L: %i, C: %i] %s: %s\n", lexer->tokens[i].loc.line, lexer->tokens[i].loc.column, TOKEN_NAMES[lexer->tokens[i].type], lexer->tokens[i].data);
+        lprintf("| [L: %i, C: %i] %s: %s\n", lexer->tokens[i].loc.line, lexer->tokens[i].loc.column, TOKEN_NAMES[lexer->tokens[i].type], lexer->tokens[i].data);
     }
-    printf("\n\n");
+    lprintf("\n\n");
 
     throw_exceptions();
 
@@ -93,9 +91,14 @@ int main() {
 
     lexer_destroy(lexer);
 
-    printf("Parser Tree:\n\n");
+    lprintf("Parser Tree:\n\n");
     print_node((node*)parser->node, NULL, 0);
-    printf("\n\n");
+    lprintf("\n\n");
+
+    return parser;
+}
+
+int main() {
 
     bind_ext_resolver resolver = {};
     resolver.count_fetch = count_fetch;
@@ -105,14 +108,31 @@ int main() {
     resolver.object_fetch = object_fetch;
     resolver.value_fetch = value_fetch;
 
+    lprintf("Parsing test_simple.rct\n");
+    FILE* in = fopen("src/r_test/test_simple.rct", "r");
+    parser_context* test_simple = parse_file(in);
+    fclose(in);
+
+    lprintf("Parsing test_external.rct\n");
+    in = fopen("src/r_test/test_external.rct", "r");
+    parser_context* test_external = parse_file(in);
+    fclose(in);
+
+
     binder_context* binder = binder_create(resolver);
 
-    binder_mount(binder, parser->node, "test_simple.rct");
-    binder_validate(binder);
+    binder_mount(binder, test_simple->node, "test_simple.rct");
+    binder_mount(binder, test_external->node, "test_external.rct");
+
+    if(binder_validate(binder)) {
+        // error!
+        lprintf("Binder error!\n");
+    }
 
     binder_destroy(binder);
 
-    parser_destroy(parser);
+    parser_destroy(test_simple);
+    parser_destroy(test_external);
 
     throw_exceptions();
 }

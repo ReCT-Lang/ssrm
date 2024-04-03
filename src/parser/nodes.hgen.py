@@ -11,6 +11,7 @@ output = '''// AUTO GENERATED!
 
 #include "parser.h"
 #include <lexer/location.h>
+#include <util/log.h>
 
 typedef char* string;
 typedef struct parser_context parser_context;
@@ -57,7 +58,7 @@ typedef struct {
 
 void list_push(parser_context* context, node_list* list, node* data);
 
-extern string NODE_TYPE_NAMES[''' + str(len(definitions)) + '''];
+extern string NODE_TYPE_NAMES[''' + str(len(definitions) + 1) + '''];
 
 '''
 
@@ -101,21 +102,21 @@ node_list* new_node_list(parser_context* context) {
 
 static void print_node_list(const char* name, node_list* list, int indent) {
     if(list->length == 0) {
-        printf("%*s%s: NULL\\n", indent * 4, "", name);
+        lprintf("%*s%s: NULL\\n", indent * 4, "", name);
         return;
     }
-    printf("%*s%s:\\n", indent * 4, "", name);
+    lprintf("%*s%s:\\n", indent * 4, "", name);
     for (int i = 0; i < list->length; ++i) {
         print_node(list->data[i], NULL, indent + 1);
     }
 }
 
 static void print_string(const char* name, string s, int indent) {
-    printf("%*s%s: \\"%s\\"\\n", indent * 4, "", name, s);
+    lprintf("%*s%s: \\"%s\\"\\n", indent * 4, "", name, s);
 }
 
 static void print_int(const char* name, int v, int indent) {
-    printf("%*s%s: \\"%i\\"\\n", indent * 4, "", name, v);
+    lprintf("%*s%s: \\"%i\\"\\n", indent * 4, "", name, v);
 }\n\n'''
 
 for t in definitions.keys():
@@ -143,9 +144,9 @@ for t in definitions.keys():
     output += "\tif(n == NULL)\n"
     output += "\t\treturn print_node((node*)n, name, indent);\n"
     output += "\tif(name == NULL)\n"
-    output += '\t\tprintf("%*s' + t.upper() + '\\n", indent * 4, "");\n'
+    output += '\t\tlprintf("%*s' + t.upper() + ' [L: %i, C: %i]\\n", indent * 4, "", n->loc.line, n->loc.column);\n'
     output += '\telse\n'
-    output += '\t\tprintf("%*s%s: ' + t.upper() + '\\n", indent * 4, "", name);\n'
+    output += '\t\tlprintf("%*s%s: ' + t.upper() + ' [L: %i, C: %i]\\n", indent * 4, "", name, n->loc.line, n->loc.column);\n'
 
     fields = definitions[t]
 
@@ -171,9 +172,9 @@ output += '''void print_node(node* node, const char* name, int indent)
 {
     if(node == NULL) {
         if(name != NULL)
-            printf("%*s%s: NULL\\n", indent * 4, "", name);
+            lprintf("%*s%s: NULL\\n", indent * 4, "", name);
         else
-            printf("%*sNULL\\n", indent * 4, "");
+            lprintf("%*sNULL\\n", indent * 4, "");
         return;
     }
     
@@ -190,7 +191,9 @@ for t in definitions.keys():
 output += '''   }
 }
 
-string NODE_TYPE_NAMES[''' + str(len(definitions)) + '''] = {'''
+string NODE_TYPE_NAMES[''' + str(len(definitions) + 1) + '''] = {
+"NODE_NULL",
+'''
 
 output += ',\n'.join(['"' + x.upper() + '"' for x in definitions.keys()])
 

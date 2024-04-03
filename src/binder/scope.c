@@ -1,4 +1,5 @@
 #include "scope.h"
+#include "util/log.h"
 
 void object_list_push(binder_context* binder, scope_object_list* list, scope_object* object) {
     // We're out of space! Reallocate
@@ -74,8 +75,13 @@ static void print_scope_object_i(scope_object* object, int indent) {
         return;
     }
 
-    printf("%*s%s: %s - private: %i\n", indent * 4, "", get_scope_name(object->object_type),
+    if(object->source == NULL)
+        lprintf("%*s%s: %s - private: %i\n", indent * 4, "", get_scope_name(object->object_type),
            object->name, object->private);
+    else
+        lprintf("%*s%s: %s - private: %i -  %s [L: %i, C: %i]\n", indent * 4, "", get_scope_name(object->object_type),
+               object->name, object->private, NODE_TYPE_NAMES[object->source->type],
+               object->source->loc.line, object->source->loc.column);
 
     for (int i = 0; i < object->children->length; ++i) {
         print_scope_object_i(object->children->objects[i], indent + 1);

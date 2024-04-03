@@ -108,6 +108,6 @@ run: all
 	./$(EXE)
 
 clean:
-	$(RM) $(BIN) $(OBJ)
+	$(RM) $(BIN) $(OBJ) $(SRC:.c=.d)
 
 .PHONY: clean, run, all, binary, obj

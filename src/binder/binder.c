@@ -4,18 +4,13 @@
 #include "scope.h"
 #include <errors/error.h>
 
-typedef enum binder_build_allowed {
-    ALLOW_PACKAGES  = 0b0000001,
-    ALLOW_CLASSES   = 0b0000010,
-    ALLOW_STRUCTS   = 0b0000100,
-    ALLOW_FUNCTIONS = 0b0001000,
-    ALLOW_VARIABLES = 0b0010000,
+scope_object* binder_build_object(binder_context* binder, node* node, scope_object* parent);
 
-    ALLOW_NONE      = 0b0000000,
-    ALLOW_ALL       = 0b0011111
-} binder_build_allowed;
-
-scope_object* binder_build_object(binder_context* binder, node* node, binder_build_allowed allowed, scope_object* parent);
+static location get_scope_location(scope_object* o) {
+    if(o->source == NULL)
+        return (location) { 0, 0 };
+    return o->source->loc;
+}
 
 static string copy_string(binder_context* context, string src) {
     string str = (string)msalloc(context->alloc_stack, (int)strlen(src) + 1);
@@ -103,6 +98,7 @@ scope_object* binder_build_ext(binder_context* binder, bind_ext_resolver resolve
 scope_object* binder_build_package(binder_context* binder, node_package_def* package_def) {
     scope_object* object = new_scope_object(binder, SCOPE_OBJECT_PACKAGE, (node*)package_def);
 
+    object->private = 1;
     object->name = copy_string(binder, package_def->package_name);
 
     bind_ext_resolver resolver = binder->resolver;
@@ -125,8 +121,7 @@ scope_object* binder_build_class(binder_context* binder, node_class_def* class_d
 
     for (int i = 0; i < class_def->body->children->length; ++i) {
         scope_object* o =
-                binder_build_object(binder, class_def->body->children->data[i],
-                                    ALLOW_CLASSES | ALLOW_FUNCTIONS | ALLOW_VARIABLES | ALLOW_STRUCTS, object);
+                binder_build_object(binder, class_def->body->children->data[i], object);
         if(o != NULL)
             object_list_push(binder, object->children, o);
     }
@@ -142,8 +137,7 @@ scope_object* binder_build_struct(binder_context* binder, node_struct_def* struc
 
     for (int i = 0; i < struct_node->body->children->length; ++i) {
         scope_object* o =
-                binder_build_object(binder, struct_node->body->children->data[i],
-                                    ALLOW_FUNCTIONS | ALLOW_VARIABLES, object);
+                binder_build_object(binder, struct_node->body->children->data[i], object);
         if(o != NULL)
             object_list_push(binder, object->children, o);
     }
@@ -163,8 +157,7 @@ scope_object* binder_build_function(binder_context* binder, node_function_def* f
 
     for (int i = 0; i < function_node->body->children->length; ++i) {
         scope_object* o =
-                binder_build_object(binder, function_node->body->children->data[i],
-                                    ALLOW_FUNCTIONS | ALLOW_VARIABLES, object);
+                binder_build_object(binder, function_node->body->children->data[i], object);
         if(o != NULL)
             object_list_push(binder, object->children, o);
     }
@@ -182,18 +175,17 @@ scope_object* binder_build_variable(binder_context* binder, node_variable_def* v
     return object;
 }
 
-scope_object* binder_build_object(binder_context* binder, node* n, binder_build_allowed allowed, scope_object* parent) {
+scope_object* binder_build_object(binder_context* binder, node* n, scope_object* parent) {
 
-    // TODO: Throw errors
-    if(n->type == NODE_PACKAGE_DEF && (allowed & ALLOW_PACKAGES))
+    if(n->type == NODE_PACKAGE_DEF)
         return binder_build_package(binder, as_node_package_def(n));
-    if(n->type == NODE_CLASS_DEF && (allowed & ALLOW_CLASSES))
+    if(n->type == NODE_CLASS_DEF)
         return binder_build_class(binder, as_node_class_def(n), parent);
-    if(n->type == NODE_STRUCT_DEF && (allowed & ALLOW_STRUCTS))
+    if(n->type == NODE_STRUCT_DEF)
         return binder_build_struct(binder, as_node_struct_def(n), parent);
-    if(n->type == NODE_FUNCTION_DEF && (allowed & ALLOW_FUNCTIONS))
+    if(n->type == NODE_FUNCTION_DEF)
         return binder_build_function(binder, as_node_function_def(n), parent);
-    if(n->type == NODE_VARIABLE_DEF && (allowed & ALLOW_VARIABLES))
+    if(n->type == NODE_VARIABLE_DEF)
         return binder_build_variable(binder, as_node_variable_def(n), parent);
 
     return NULL;
@@ -205,7 +197,7 @@ scope_object* binder_build_global(binder_context* binder, node_root* root) {
     scope_object* global_scope = new_scope_object(binder, SCOPE_OBJECT_GLOBAL, (node*)root);
 
     for (int i = 0; i < root->children->length; ++i) {
-        scope_object* o = binder_build_object(binder, root->children->data[i], ALLOW_ALL, global_scope);
+        scope_object* o = binder_build_object(binder, root->children->data[i], global_scope);
         if(o != NULL)
             object_list_push(binder, global_scope->children, o);
     }
@@ -278,7 +270,11 @@ static int validate_scope(binder_context* binder, scope_object* scope, scope_obj
         return 0;
 
     if (!(scope->object_type & allowed)) { // Flag check!
-        error_throw("RCT3001", (location){0, 0}, "Attempted to define disallowed type %s", get_scope_name(scope->object_type));
+        if(scope->parent == NULL)
+            error_throw("RCT3001", get_scope_location(scope), "Attempted to define disallowed type %s", get_scope_name(scope->object_type));
+        else
+            error_throw("RCT3001",get_scope_location(scope), "Attempted to define disallowed type %s within %s", get_scope_name(scope->object_type),
+                        get_scope_name(scope->parent->object_type));
         return 1;
     }
 
@@ -295,7 +291,7 @@ static int validate_scope(binder_context* binder, scope_object* scope, scope_obj
     if(scope->object_type == SCOPE_OBJECT_VARIABLE)
         return 0;
 
-    error_throw("RCT3001", (location){0, 0}, "Attempted to define unhandled type %s", get_scope_name(scope->object_type));
+    error_throw("RCT3001", get_scope_location(scope), "Attempted to define unhandled type %s", get_scope_name(scope->object_type));
     return 1;
 }
 
@@ -308,7 +304,65 @@ static int validate_root_glob_scope(binder_context* binder, scope_object* global
     return failed;
 }
 
-void binder_validate(binder_context* binder) {
+static int validate_binary_expression(scope_object* object, node_binary_exp* binary) {
+    error_throw("RCT3666", binary->loc, "Binaries are a no-no");
+    return 1;
+}
+
+static int validate_unary_expression(scope_object* object, node_unary_exp* unary) {
+    error_throw("RCT3666", unary->loc, "Unaries are a no-no");
+    return 1;
+}
+
+static int validate_statement(scope_object* object, node* expression) {
+    if(expression->type == NODE_BINARY_EXP)
+        return validate_binary_expression(object, as_node_binary_exp(expression));
+    if(expression->type == NODE_UNARY_EXP)
+        return validate_unary_expression(object, as_node_unary_exp(expression));
+    if(expression->type == NODE_LITERAL)
+        return 0; // Literals are safe :D
+    lprintf("Unexpected statement/expression node %s\n", NODE_TYPE_NAMES[expression->type]);
+    return 1;
+}
+
+static int validate_expression_so(scope_object* object) {
+    if(object->source == NULL) {
+        lprintf("Could not find source for expression node!?\n");
+        return 0;
+    }
+
+    if(object->object_type == SCOPE_OBJECT_FUNCTION) {
+        node_function_def* function = as_node_function_def(object->source);
+        error_throw("RCT3666", function->loc, "Functions are scary");
+        // TODO: Functions are scary.
+        return 0;
+    } else if(object->object_type == SCOPE_OBJECT_VARIABLE) {
+        node_variable_def* variable = as_node_variable_def(object->source);
+        if(variable->default_value)
+            validate_statement(object, variable->default_value);
+    }
+
+    lprintf("Could not validate node!\n");
+    return 0;
+}
+
+static int check_expressions(scope_object* object) {
+    if(object->object_type == SCOPE_OBJECT_FUNCTION) {
+        return validate_expression_so(object);
+    } else if (object->object_type == SCOPE_OBJECT_VARIABLE) {
+        return validate_expression_so(object);
+    } else {
+        int failed = 0;
+        for (int i = 0; i < object->children->length; ++i) {
+            if(check_expressions(object->children->objects[i]))
+                failed = 1;
+        }
+        return failed;
+    }
+    return 0;
+}
+
+int binder_validate(binder_context* binder) {
 
     // 1. Build the "program tree".
     scope_object* root_scope = new_scope_object(binder, SCOPE_OBJECT_GLOBAL, NULL);
@@ -322,7 +376,14 @@ void binder_validate(binder_context* binder) {
     print_scope_object(root_scope);
 
     // 2. Validate program tree/object tree
-    validate_root_glob_scope(binder, root_scope);
+    if(validate_root_glob_scope(binder, root_scope)) {
+        return 1;
+    }
+
+    // 3. Validate all expressiosn
+    if(check_expressions(root_scope)) {
+        return 1;
+    }
 }
 
 void binder_destroy(binder_context* binder) {

@@ -291,11 +291,18 @@ static void lex_numeric(lexer_context* context) {
     token.loc = context->loc;
 
     int c;
+    int has_decimal = 0;
     while (1) {
         c = current(context);
 
         // TODO: Decimals fucking suck.
-        if(!is_char_numeric(c)) break;
+
+        // We allow underscore for splitting apart long numerics like 1000000 into 1_000_000
+        if(c == '_') { step(context, 1); continue;}
+        if(c == '.' && !has_decimal) {
+            has_decimal = 1;
+        }
+        else if(!is_char_numeric(c)) break;
         if(buffer_size <= length + 1) {
             char* new = realloc(read_buffer, buffer_size * 2);
             if(new == NULL) {
@@ -314,7 +321,7 @@ static void lex_numeric(lexer_context* context) {
     }
 
 
-    if(buffer_size <= length + 1) {
+    if(buffer_size <= length + 2) {
         char* new = realloc(read_buffer, buffer_size * 2);
         if(new == NULL) {
             fprintf(stderr, "Numeric read buffer could not be reallocated\n");
@@ -322,6 +329,11 @@ static void lex_numeric(lexer_context* context) {
             exit(EXIT_FAILURE);
         }
         read_buffer = new;
+    }
+    if(current(context) == 'f') {
+        read_buffer[length] = 'f';
+        step(context, 1);
+        length++;
     }
     read_buffer[length] = 0;
 
@@ -404,6 +416,7 @@ void lexer_process(lexer_context* context) {
         if(current(context) == '"') { lex_string(context); continue; }
         if(is_char_word_starter(current(context))) { lex_word(context); continue; }
         if(is_char_numeric(current(context))) { lex_numeric(context); continue; }
+        if(current(context) == '.') { lex_numeric(context); continue; }
         // For now, we just get mad :)
         step(context, 1);
         error_throw("RCT1010", context->loc, "Invalid token %2X(%c)", current(context), current(context));

@@ -35,6 +35,9 @@ class MyType {
         // We can also return null or nil if we wish.
         return make MyType(true);
     }
+
+    set class SubType {
+    }
 }
 
 // BOOM, we're reduced to fixed-size statements!
