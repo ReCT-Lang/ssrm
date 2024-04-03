@@ -15,6 +15,8 @@ void error_throw(error_code code, location loc, const char* fmt, ...);
 // This makes a copy of all errors, so you need to clean up them yourself.
 int enumerate_errors(error* list);
 
+void allow_error_print(int enabled);
+
 void free_error(error err);
 
 // Delete currently stored errors

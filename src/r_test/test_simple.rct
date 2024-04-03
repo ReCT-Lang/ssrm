@@ -8,6 +8,8 @@ package sys;
 
 sys::Print("My String!");
 
+extern function test(param abs::Something) -> ced::void;
+
 // Optionally, pointers could be a generic type.
 // You'd have to do a compile-time linking to the c stdlib in order to resolve this extern
 extern function malloc(long size) -> ref[void];

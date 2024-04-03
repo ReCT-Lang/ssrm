@@ -12,6 +12,8 @@ typedef struct error_list_node {
 error_list_node* root_node = NULL;
 error_list_node* last = NULL;
 
+static int print_errors = 0;
+
 int enumerate_errors(error* list) {
     int count = 0;
     error_list_node* current_node = root_node;
@@ -55,7 +57,8 @@ void error_throw(error_code code, location loc, const char* fmt, ...) {
 
     error e = {.code = code, .loc = loc, .string = error_msg};
 
-    fprintf(stderr, "[ERR] [L: %u, C: %u] %s: %s\n", e.loc.line, e.loc.column, e.code, e.string);
+    if(print_errors)
+        fprintf(stderr, "[ERR] [L: %u, C: %u] %s: %s\n", e.loc.line, e.loc.column, e.code, e.string);
 
     // We push everything to a linked list for ease.
     if(root_node == NULL) {
@@ -70,4 +73,8 @@ void error_throw(error_code code, location loc, const char* fmt, ...) {
 
         last = last->next;
     }
+}
+
+void allow_error_print(int enabled) {
+    print_errors = enabled ? 1 : 0;
 }

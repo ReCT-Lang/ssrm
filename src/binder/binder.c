@@ -4,7 +4,27 @@
 #include "scope.h"
 #include <errors/error.h>
 
+static int streq(string a, string b) {
+    int a_len = strlen(a);
+    int b_len = strlen(b);
+    if(a_len != b_len)
+        return 0;
+    for (int i = 0; i < a_len; ++i) {
+        if(a[i] != b[i])
+            return 0;
+    }
+    return 1;
+}
+
 scope_object* binder_build_object(binder_context* binder, node* node, scope_object* parent);
+
+static scope_object* get_scope_child(scope_object* o, string name) {
+    for (int i = 0; i < o->children->length; ++i) {
+        if(streq(o->children->objects[i]->name, name))
+            return o;
+    }
+    return NULL;
+}
 
 static location get_scope_location(scope_object* o) {
     if(o->source == NULL)
@@ -191,8 +211,6 @@ scope_object* binder_build_object(binder_context* binder, node* n, scope_object*
     return NULL;
 }
 
-
-
 scope_object* binder_build_global(binder_context* binder, node_root* root) {
     scope_object* global_scope = new_scope_object(binder, SCOPE_OBJECT_GLOBAL, (node*)root);
 
@@ -304,6 +322,71 @@ static int validate_root_glob_scope(binder_context* binder, scope_object* global
     return failed;
 }
 
+
+static int validate_identifier(scope_object* scope, node_identifier* identifier) {
+    if(scope == NULL)
+        return 1;
+    if(identifier == NULL)
+        return 1;
+
+    if(identifier->package) {
+        scope_object* current = scope;
+        while (current->object_type != SCOPE_OBJECT_GLOBAL) {
+            current = scope->parent;
+        }
+        scope_object* package_scope = get_scope_child(current, identifier->name);
+        if(package_scope == NULL) {
+            error_throw("RCT3009", identifier->loc, "Tried to access invalid package %s. Is it imported?", identifier->name);
+            return 1;
+        }
+        return validate_identifier(package_scope, identifier->child); // Time to get searching
+    }
+
+    // We cannot step out into the project tree from our package
+    int allow_step_out = (scope->object_type == SCOPE_OBJECT_PACKAGE ? 0 : 1);
+    // Our package privates remain private. We may however step down ONE level for now.
+    int allow_private_step_in = (scope->object_type == SCOPE_OBJECT_PACKAGE ? 0 : 1);
+
+    // We will step back scope-by-scope until we hit
+    scope_object* current = scope;
+
+    return 1;
+
+    while (current != NULL) // TODO: THIS. Kill me.
+    {
+        scope_object* level_current = current;
+        node_identifier* ident_level_current = identifier;
+
+        int levels = 0;
+        // Step through the identifier
+        while (ident_level_current != NULL) {
+            for (int i = 0; i < level_current->children->length; ++i) {
+                scope_object* child = level_current->children->objects[i];
+
+                // If it's private, and we cannot allow it, skip.
+                // TODO: If it's same-name, we need to throw error!
+                if(child->private && !(allow_private_step_in && levels == 0))
+                    continue;
+
+                if(streq(child->name, ident_level_current->name)) {
+                    level_current = child;
+                    ident_level_current = ident_level_current->child;
+                }
+            }
+
+            levels++;
+        }
+
+        if(allow_step_out)
+            current = current->parent;
+        else
+            break;
+    }
+
+    error_throw("RCT3009", identifier->loc, "Could not find valid access for identifier [insert ident]");
+    return 1;
+}
+
 static int validate_binary_expression(scope_object* object, node_binary_exp* binary) {
     error_throw("RCT3666", binary->loc, "Binaries are a no-no");
     return 1;
@@ -314,13 +397,37 @@ static int validate_unary_expression(scope_object* object, node_unary_exp* unary
     return 1;
 }
 
-static int validate_statement(scope_object* object, node* expression) {
+static int validate_expression(scope_object* object, node* expression) {
     if(expression->type == NODE_BINARY_EXP)
         return validate_binary_expression(object, as_node_binary_exp(expression));
     if(expression->type == NODE_UNARY_EXP)
         return validate_unary_expression(object, as_node_unary_exp(expression));
     if(expression->type == NODE_LITERAL)
         return 0; // Literals are safe :D
+}
+
+static int validate_statement(scope_object* object, node* expression) {
+    if(expression == NULL)
+        return 0;
+
+    if(expression->type == NODE_BINARY_EXP)
+        return validate_expression(object, expression);
+    if(expression->type == NODE_UNARY_EXP)
+        return validate_expression(object, expression);
+    if(expression->type == NODE_LITERAL)
+        return validate_expression(object, expression);
+
+    if(expression->type == NODE_VARIABLE_DEF) {
+        node_variable_def* variable = as_node_variable_def(expression);
+        int failed = 0;
+        if(variable->value_type)
+            if(validate_identifier(object, variable->value_type))
+                failed = 1;
+        if(variable->default_value)
+            if(validate_statement(object, variable->default_value))
+                failed = 1;
+        return failed;
+    }
     lprintf("Unexpected statement/expression node %s\n", NODE_TYPE_NAMES[expression->type]);
     return 1;
 }
@@ -333,13 +440,47 @@ static int validate_expression_so(scope_object* object) {
 
     if(object->object_type == SCOPE_OBJECT_FUNCTION) {
         node_function_def* function = as_node_function_def(object->source);
-        error_throw("RCT3666", function->loc, "Functions are scary");
-        // TODO: Functions are scary.
-        return 0;
+
+        int failed = 0;
+
+        if(function->return_type)
+            if(validate_identifier(object, function->return_type))
+                failed = 1;
+
+        if(function->body) {
+            for (int i = 0; i < function->body->children->length; ++i) {
+                if(validate_statement(object, function->body->children->data[i]))
+                    failed = 1;
+            }
+        }
+
+        if(function->parameters) {
+            string usedNames[function->parameters->length];
+            int usedLength = 0;
+            for (int i = 0; i < function->parameters->length; ++i) {
+                node_parameter* parameter = as_node_parameter(function->parameters->data[i]);
+
+                for (int j = 0; j < usedLength; ++j) {
+                    if(streq(usedNames[j], parameter->name)) {
+                        error_throw("RCT3010", parameter->loc, "Parameter %s already defined!", parameter->name);
+                    }
+                }
+                usedNames[usedLength++] = parameter->name;
+
+
+                if(!parameter)
+                    continue;
+                if(validate_identifier(object, parameter->value_type))
+                    failed = 1;
+                if(parameter->default_value)
+                    if(validate_statement(object, parameter->default_value))
+                        failed = 1;
+            }
+        }
+
+        return failed;
     } else if(object->object_type == SCOPE_OBJECT_VARIABLE) {
-        node_variable_def* variable = as_node_variable_def(object->source);
-        if(variable->default_value)
-            validate_statement(object, variable->default_value);
+        return validate_statement(object, object->source);
     }
 
     lprintf("Could not validate node!\n");
@@ -380,10 +521,15 @@ int binder_validate(binder_context* binder) {
         return 1;
     }
 
-    // 3. Validate all expressiosn
+    // 3. Validate all expressions(make sure everything explicitly declared EXISTS)
+    // THIS DOES NOT PERFORM TYPE CHECKS!!!
     if(check_expressions(root_scope)) {
         return 1;
     }
+
+    // 4. Type checks - Can we add a string and a long? Can we call .GetLength() on a void?
+
+    return 0;
 }
 
 void binder_destroy(binder_context* binder) {
