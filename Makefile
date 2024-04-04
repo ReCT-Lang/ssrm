@@ -55,6 +55,7 @@ MODS:=/cli /lexer /util /parser /errors /binder
 
 CPY:=$(foreach mod,$(MODS),$(wildcard src$(mod)/*.cgen.py))
 HPY:=$(foreach mod,$(MODS),$(wildcard src$(mod)/*.hgen.py))
+
 SRC:=$(foreach mod,$(MODS),$(wildcard src$(mod)/*.c)) $(patsubst %.cgen.py,%.c,$(CPY)) memstack/src/memstack.c
 HDR:=$(foreach mod,$(MODS),$(wildcard src$(mod)/*.h)) $(patsubst %.hgen.py,%.h,$(HPY)) memstack/include/memstack.c
 RCT:=$(wildcard src/r_test/*.rct)

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "scope.h"
+#include "stdlib_bind.h"
 #include <errors/error.h>
 
 static int streq(string a, string b) {
@@ -16,12 +17,40 @@ static int streq(string a, string b) {
     return 1;
 }
 
+static string format_identifier(binder_context* binder, node_identifier* identifier){
+    string s = msalloc(binder->alloc_stack, 1024); // TODO: If it's longer than 1024 we're FUCKED.
+    int index = 0;
+
+    node_identifier* current = identifier;
+    while (current != NULL) {
+        char* c = current->name;
+        while (*c) {
+            s[index++] = *c;
+            c++;
+        }
+
+        if(current->package) {
+            s[index++] = ':';
+            s[index++] = ':';
+        } else if(current->child != NULL) {
+            s[index++] = '-';
+            s[index++] = '>';
+        }
+
+        current = current->child;
+    }
+
+    s[index++] = '\0';
+
+    return s;
+}
+
 scope_object* binder_build_object(binder_context* binder, node* node, scope_object* parent);
 
 static scope_object* get_scope_child(scope_object* o, string name) {
     for (int i = 0; i < o->children->length; ++i) {
         if(streq(o->children->objects[i]->name, name))
-            return o;
+            return o->children->objects[i];
     }
     return NULL;
 }
@@ -323,7 +352,7 @@ static int validate_root_glob_scope(binder_context* binder, scope_object* global
 }
 
 
-static int validate_identifier(scope_object* scope, node_identifier* identifier) {
+static int validate_identifier(binder_context* binder, scope_object* scope, node_identifier* identifier) {
     if(scope == NULL)
         return 1;
     if(identifier == NULL)
@@ -339,52 +368,95 @@ static int validate_identifier(scope_object* scope, node_identifier* identifier)
             error_throw("RCT3009", identifier->loc, "Tried to access invalid package %s. Is it imported?", identifier->name);
             return 1;
         }
-        return validate_identifier(package_scope, identifier->child); // Time to get searching
+        return validate_identifier(binder, package_scope, identifier->child); // Time to get searching
     }
+
+    // How do we want to do this?
+    // - We need to find the first acceptable layer where the root part of the ident is defined.
+    // - Then we need to check if the child parts of the ident are valid.
+    // - If they aren't, we error.
+    // - If we cannot find a valid layer, we error.
 
     // We cannot step out into the project tree from our package
     int allow_step_out = (scope->object_type == SCOPE_OBJECT_PACKAGE ? 0 : 1);
-    // Our package privates remain private. We may however step down ONE level for now.
-    int allow_private_step_in = (scope->object_type == SCOPE_OBJECT_PACKAGE ? 0 : 1);
 
-    // We will step back scope-by-scope until we hit
-    scope_object* current = scope;
+    // First step is to find this layer
+    scope_object* current_scope_layer = scope;
+    while (1) {
 
-    return 1;
+        // Handle separate file access :D
+        if(current_scope_layer->parent == NULL) {
+            for (int i = 0; i < current_scope_layer->children->length; ++i) {
+                scope_object* c = current_scope_layer->children->objects[i];
+                if(c->object_type == SCOPE_OBJECT_GLOBAL) {
+                    scope_object* ident_first = get_scope_child(c, identifier->name);
+                    if(ident_first) {
+                        if(ident_first->object_type == SCOPE_OBJECT_GLOBAL || ident_first->object_type == SCOPE_OBJECT_PACKAGE) {
+                            error_throw("RCT3009", identifier->loc, "Could not find valid access for identifier %s", format_identifier(binder, identifier));
+                            return 1;
+                        }
+                        if(ident_first->private) {
+                            error_throw("RCT3009", identifier->loc, "Could not access %s, defined inside %s", format_identifier(binder, identifier), c->name);
+                            return 1;
+                        }
 
-    while (current != NULL) // TODO: THIS. Kill me.
-    {
-        scope_object* level_current = current;
-        node_identifier* ident_level_current = identifier;
-
-        int levels = 0;
-        // Step through the identifier
-        while (ident_level_current != NULL) {
-            for (int i = 0; i < level_current->children->length; ++i) {
-                scope_object* child = level_current->children->objects[i];
-
-                // If it's private, and we cannot allow it, skip.
-                // TODO: If it's same-name, we need to throw error!
-                if(child->private && !(allow_private_step_in && levels == 0))
-                    continue;
-
-                if(streq(child->name, ident_level_current->name)) {
-                    level_current = child;
-                    ident_level_current = ident_level_current->child;
+                        current_scope_layer = ident_first;
+                        break;
+                    }
                 }
             }
-
-            levels++;
         }
 
-        if(allow_step_out)
-            current = current->parent;
-        else
+        scope_object* ident_first = get_scope_child(current_scope_layer, identifier->name);
+        if(ident_first) {
+            if(ident_first->object_type == SCOPE_OBJECT_GLOBAL || ident_first->object_type == SCOPE_OBJECT_PACKAGE) {
+                error_throw("RCT3009", identifier->loc, "Could not find valid access for identifier %s", format_identifier(binder, identifier));
+                return 1;
+            }
+
+            current_scope_layer = ident_first;
             break;
+        }
+
+        if(!allow_step_out) {
+            error_throw("RCT3019", identifier->loc, "Could not find valid access for identifier [insert ident] in package %s", identifier->name);
+            return 1;
+        }
+
+        current_scope_layer = current_scope_layer->parent;
+        if(current_scope_layer == NULL) {
+            error_throw("RCT3009", identifier->loc, "Could not find valid access for identifier %s", format_identifier(binder, identifier));
+            return 1;
+        }
     }
 
-    error_throw("RCT3009", identifier->loc, "Could not find valid access for identifier [insert ident]");
+    // We now have the first layer.
+    node_identifier* layer_current = identifier->child;
+
+    if(layer_current == NULL) // It's single-depth and cannot be iterated upon!
+        return 0;
+
+    while (layer_current != NULL) {
+        scope_object* ident_first = get_scope_child(current_scope_layer, layer_current->name);
+        if(ident_first) {
+
+            if(ident_first->private) {
+                error_throw("RCT3009", identifier->loc, "Could not access %s inside %s", format_identifier(binder, layer_current), format_identifier(binder, identifier));
+                return 1;
+            }
+
+            layer_current = layer_current->child;
+            current_scope_layer = ident_first;
+            return 0;
+        } else {
+            error_throw("RCT3009", identifier->loc, "Could not find %s inside %s", format_identifier(binder, layer_current),
+                        format_identifier(binder, identifier));
+            return 1;
+        }
+    }
+
     return 1;
+
 }
 
 static int validate_binary_expression(scope_object* object, node_binary_exp* binary) {
@@ -406,7 +478,7 @@ static int validate_expression(scope_object* object, node* expression) {
         return 0; // Literals are safe :D
 }
 
-static int validate_statement(scope_object* object, node* expression) {
+static int validate_statement(binder_context* binder, scope_object* object, node* expression) {
     if(expression == NULL)
         return 0;
 
@@ -421,10 +493,10 @@ static int validate_statement(scope_object* object, node* expression) {
         node_variable_def* variable = as_node_variable_def(expression);
         int failed = 0;
         if(variable->value_type)
-            if(validate_identifier(object, variable->value_type))
+            if(validate_identifier(binder, object, variable->value_type))
                 failed = 1;
         if(variable->default_value)
-            if(validate_statement(object, variable->default_value))
+            if(validate_statement(binder, object, variable->default_value))
                 failed = 1;
         return failed;
     }
@@ -432,9 +504,8 @@ static int validate_statement(scope_object* object, node* expression) {
     return 1;
 }
 
-static int validate_expression_so(scope_object* object) {
+static int validate_expression_so(binder_context* binder, scope_object* object) {
     if(object->source == NULL) {
-        lprintf("Could not find source for expression node!?\n");
         return 0;
     }
 
@@ -444,12 +515,12 @@ static int validate_expression_so(scope_object* object) {
         int failed = 0;
 
         if(function->return_type)
-            if(validate_identifier(object, function->return_type))
+            if(validate_identifier(binder, object, function->return_type))
                 failed = 1;
 
         if(function->body) {
             for (int i = 0; i < function->body->children->length; ++i) {
-                if(validate_statement(object, function->body->children->data[i]))
+                if(validate_statement(binder, object, function->body->children->data[i]))
                     failed = 1;
             }
         }
@@ -470,32 +541,32 @@ static int validate_expression_so(scope_object* object) {
 
                 if(!parameter)
                     continue;
-                if(validate_identifier(object, parameter->value_type))
+                if(validate_identifier(binder, object, parameter->value_type))
                     failed = 1;
                 if(parameter->default_value)
-                    if(validate_statement(object, parameter->default_value))
+                    if(validate_statement(binder, object, parameter->default_value))
                         failed = 1;
             }
         }
 
         return failed;
     } else if(object->object_type == SCOPE_OBJECT_VARIABLE) {
-        return validate_statement(object, object->source);
+        return validate_statement(binder, object, object->source);
     }
 
     lprintf("Could not validate node!\n");
     return 0;
 }
 
-static int check_expressions(scope_object* object) {
+static int check_expressions(binder_context* binder, scope_object* object) {
     if(object->object_type == SCOPE_OBJECT_FUNCTION) {
-        return validate_expression_so(object);
+        return validate_expression_so(binder, object);
     } else if (object->object_type == SCOPE_OBJECT_VARIABLE) {
-        return validate_expression_so(object);
+        return validate_expression_so(binder, object);
     } else {
         int failed = 0;
         for (int i = 0; i < object->children->length; ++i) {
-            if(check_expressions(object->children->objects[i]))
+            if(check_expressions(binder, object->children->objects[i]))
                 failed = 1;
         }
         return failed;
@@ -511,8 +582,11 @@ int binder_validate(binder_context* binder) {
     for (int i = 0; i < binder->program_node_count; ++i) {
         scope_object* object = binder_build_global(binder, binder->program_nodes[i].root);
         object->name = binder->program_nodes[i].name;
+        object->parent = root_scope;
         object_list_push(binder, root_scope->children, object);
     }
+
+    push_stdlib(binder, root_scope);
 
     print_scope_object(root_scope);
 
@@ -523,7 +597,7 @@ int binder_validate(binder_context* binder) {
 
     // 3. Validate all expressions(make sure everything explicitly declared EXISTS)
     // THIS DOES NOT PERFORM TYPE CHECKS!!!
-    if(check_expressions(root_scope)) {
+    if(check_expressions(binder, root_scope)) {
         return 1;
     }
 

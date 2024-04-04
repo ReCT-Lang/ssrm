@@ -1,0 +1,24 @@
+{
+  "ref": {
+    "type": "SCOPE_OBJECT_CLASS",
+    "private": false,
+
+    "children": {
+    }
+  },
+  "string": {
+    "type": "SCOPE_OBJECT_CLASS",
+    "private": false,
+
+    "children": {
+      "GetLength": {
+        "type": "SCOPE_OBJECT_FUNCTION",
+        "private": false
+      },
+      "Empty": {
+        "type": "SCOPE_OBJECT_VARIABLE",
+        "private": false
+      }
+    }
+  }
+}
