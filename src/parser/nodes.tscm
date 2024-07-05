@@ -114,5 +114,5 @@ begin node_while : node
 end
 
 begin abstract node_expression : node
-    function eval_type -> void
+
 end
