@@ -213,7 +213,7 @@ def write_type_functions(node_type: NodeType, root_type: NodeType):
             output_file.write(data_type + " " + node_type.name + "_" + f + "(" + node_type.name + "* node);\n")
         else:
             output_file.write(
-                data_type + " " + node_type.name + "_" + f + "_" + root_type.name + "(" + root_type.name + "* node);\n")
+                data_type + " __impl_" + node_type.name + "_" + f + "_" + root_type.name + "(" + root_type.name + "* node);\n")
 
 
 def write_type_header(node_type: NodeType):
@@ -325,8 +325,8 @@ for t in type_table.keys():
             output_file.write("\tswitch (n->type) {\n")
             for it in type_table.values():
                 if it.does_inherit(t):
-                    abstracts.append(type_table[t].functions[f] + " " + t + "_" + f + "_" + it.name + "(" + it.name + "* n) {}")
-                    output_file.write("\t\tcase " + it.name.upper() + ":\n\t\t\treturn " + t + "_" + f + "_" + it.name + "(as_" + it.name + "((node*)n));\n")
+                    abstracts.append(type_table[t].functions[f] + " __impl_" + t + "_" + f + "_" + it.name + "(" + it.name + "* n) {}")
+                    output_file.write("\t\tcase " + it.name.upper() + ":\n\t\t\treturn __impl_" + t + "_" + f + "_" + it.name + "(as_" + it.name + "((node*)n));\n")
 
             output_file.write("\t}\n")
             output_file.write("}\n\n")
