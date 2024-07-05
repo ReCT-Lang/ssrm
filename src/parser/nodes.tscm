@@ -1,0 +1,118 @@
+# Base node type definitions
+
+begin abstract node
+    variable type -> node_type
+    variable loc -> location
+end
+
+begin node_root : node
+  variable children -> node_list
+end
+
+begin node_package_def : node
+  variable package_name -> string
+end
+
+begin node_use_def : node
+  variable package_name -> string
+end
+
+begin node_class_def : node
+  variable name -> string
+  variable flags -> permissions
+  variable body -> node_body
+  variable generics -> node_list
+end
+
+begin node_struct_def : node
+  variable name -> string
+  variable flags -> permissions
+  variable body -> node_body
+end
+
+begin node_function_def : node
+  variable name -> string
+  variable flags -> permissions
+  variable return_type -> node_identifier
+  variable body -> node_body
+  variable parameters -> node_list
+end
+
+begin node_enum_def : node
+  variable name -> string
+  variable flags -> permissions
+end
+
+begin node_identifier : node
+  variable name -> string
+  variable package -> int
+  variable child -> node_identifier
+  variable generic_values -> node_list
+end
+
+begin node_body : node
+  variable children -> node_list
+end
+
+begin node_variable_def : node
+  variable name -> string
+  variable flags -> permissions
+  variable value_type -> node_identifier
+  variable default_value -> node
+end
+
+begin node_parameter : node
+  variable name -> string
+  variable value_type -> node_identifier
+  variable default_value -> node
+end
+
+begin node_literal : node_expression
+  variable value -> string
+end
+
+begin node_assignation : node
+  variable operator -> operators
+  variable target -> node_identifier
+  variable value -> node
+end
+
+begin node_unary_exp : node_expression
+  variable operator -> operators
+  variable operand -> node
+end
+
+begin node_binary_exp : node_expression
+  variable operator -> operators
+  variable left -> node
+  variable right -> node
+end
+
+begin node_function_call : node_expression
+  variable target -> node_identifier
+  variable parameters -> node_list
+end
+
+begin node_make : node
+  variable target -> node_identifier
+  variable parameters -> node_list
+end
+
+begin node_return : node
+  variable value -> node_expression
+end
+
+begin node_if : node
+  variable condition -> node_expression
+  variable execute -> node_body
+  variable else_case -> node
+end
+
+begin node_while : node
+  variable condition -> node_expression
+  variable execute -> node_body
+end
+
+begin abstract node_expression : node
+    function eval_type -> void
+end
