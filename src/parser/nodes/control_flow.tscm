@@ -1,0 +1,10 @@
+begin node_if : node
+  variable condition -> node_expression
+  variable execute -> node_body
+  variable else_case -> node
+end
+
+begin node_while : node
+  variable condition -> node_expression
+  variable execute -> node_body
+end

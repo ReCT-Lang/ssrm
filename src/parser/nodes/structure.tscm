@@ -1,0 +1,42 @@
+# Nodes responsible for basic program structure
+# So, classes etc
+
+begin node_root : node
+  variable children -> node_list
+end
+
+begin node_class_def : node
+  variable name -> string
+  variable flags -> permissions
+  variable body -> node_body
+  variable generics -> node_list
+end
+
+begin node_struct_def : node
+  variable name -> string
+  variable flags -> permissions
+  variable body -> node_body
+end
+
+begin node_function_def : node
+  variable name -> string
+  variable flags -> permissions
+  variable return_type -> node_identifier
+  variable body -> node_body
+  variable parameters -> node_list
+end
+
+begin node_parameter : node
+  variable name -> string
+  variable value_type -> node_identifier
+  variable default_value -> node
+end
+
+begin node_enum_def : node
+  variable name -> string
+  variable flags -> permissions
+end
+
+begin node_body : node
+  variable children -> node_list
+end

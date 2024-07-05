@@ -26,11 +26,10 @@ class NodeType:
 
 
 type_table: dict[str, NodeType] = {}
-
+parsed = []
 
 def parse_file(file):
     current_parsing_type: NodeType | None = None
-
     while True:
         line = file.readline()
         if not line:
@@ -71,6 +70,14 @@ def parse_file(file):
         if parts[0].lower() == "function":
             current_parsing_type.functions[parts[1]] = parts[3]
             continue
+
+        if parts[0].lower() == "include":
+            if parts[1] in parsed:
+                continue
+            parsed.append(parts[1])
+            included_file = open(parts[1], "r")
+            parse_file(included_file)
+            included_file.close()
 
 
 input_file = open("nodes.tscm", "r")

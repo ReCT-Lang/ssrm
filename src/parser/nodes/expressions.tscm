@@ -1,0 +1,30 @@
+# Expression nodes
+
+begin abstract node_expression : node
+
+end
+
+begin node_unary_exp : node_expression
+  variable operator -> operators
+  variable operand -> node
+end
+
+begin node_binary_exp : node_expression
+  variable operator -> operators
+  variable left -> node
+  variable right -> node
+end
+
+begin node_function_call : node_expression
+  variable target -> node_identifier
+  variable parameters -> node_list
+end
+
+begin node_literal : node_expression
+  variable value -> string
+end
+
+begin node_make : node_expression
+  variable target -> node_identifier
+  variable parameters -> node_list
+end
