@@ -128,7 +128,7 @@ scope_object* binder_build_ext(binder_context* binder, bind_ext_resolver resolve
                 function->private = 0;
                 function->parent = function;
 
-                // We assume a child(or whetever else you want me to say)
+                // We assume a child(or whatever else you want me to say)
                 bind_ext_object p = resolver.object_fetch(value, 0);
                 scope_object* param_t = new_scope_object(binder, SCOPE_OBJECT_TYPE, NULL);
                 param->name = read_value(binder, resolver, p);
@@ -288,9 +288,6 @@ static int validate_global_scope(binder_context* binder, scope_object* global) {
 static int validate_function_scope(binder_context* binder, scope_object* global) {
     int failed = 0;
     for (int i = 0; i < global->children->length; ++i) {
-        // Global scopes may contain anything(except global scopes), so we just go for it
-        // By doing SCOPE_OBJECT_ALL and XOR-ing SCOPE_OBJECT_GLOBAL we basically set the flags to everything
-        // but SCOPE_OBJECT_GLOBAL. Could also do `ALL & !GLOB` but I get complaints about simplifying to `& 0`
         if(validate_scope(binder, global->children->objects[i], SCOPE_OBJECT_VARIABLE))
             failed = 1;
     }
@@ -300,9 +297,6 @@ static int validate_function_scope(binder_context* binder, scope_object* global)
 static int validate_package_scope(binder_context* binder, scope_object* global) {
     int failed = 0;
     for (int i = 0; i < global->children->length; ++i) {
-        // Global scopes may contain anything(except global scopes), so we just go for it
-        // By doing SCOPE_OBJECT_ALL and XOR-ing SCOPE_OBJECT_GLOBAL we basically set the flags to everything
-        // but SCOPE_OBJECT_GLOBAL. Could also do `ALL & !GLOB` but I get complaints about simplifying to `& 0`
         if(validate_scope(binder, global->children->objects[i], SCOPE_OBJECT_VARIABLE | SCOPE_OBJECT_FUNCTION
             | SCOPE_OBJECT_CLASS | SCOPE_OBJECT_STRUCT))
             failed = 1;
