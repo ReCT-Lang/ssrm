@@ -3,6 +3,7 @@
 #include <string.h>
 #include "scope.h"
 #include "stdlib_bind.h"
+#include "type_check.h"
 #include <errors/error.h>
 
 static int streq(string a, string b) {
@@ -47,7 +48,7 @@ static string format_identifier(binder_context* binder, node_identifier* identif
 
 scope_object* binder_build_object(binder_context* binder, node* node, scope_object* parent);
 
-static scope_object* get_scope_child(scope_object* o, string name) {
+scope_object* get_scope_child(scope_object* o, string name) {
     for (int i = 0; i < o->children->length; ++i) {
         if(streq(o->children->objects[i]->name, name))
             return o->children->objects[i];
@@ -89,7 +90,7 @@ void binder_mount(binder_context* binder, node_root* program_node, string filena
     // For now, we'll not bother about performant lists, since we won't do *that* many adds.
     // Like, one thousand isn't too damn bad
 
-    binder_bound_program* new_array = msalloc(binder->alloc_stack, binder->program_node_count + 1);
+    binder_bound_program* new_array = msalloc(binder->alloc_stack, sizeof(binder_bound_program) * (binder->program_node_count + 1));
     for (int i = 0; i < binder->program_node_count; ++i) {
         new_array[i] = binder->program_nodes[i];
     }
@@ -459,6 +460,7 @@ static int validate_identifier(binder_context* binder, scope_object* scope, node
 
 }
 
+// TODO: Expression parsing
 static int validate_binary_expression(scope_object* object, node_binary_exp* binary) {
     error_throw("RCT3666", binary->loc, "Binaries are a no-no");
     return 1;
@@ -478,6 +480,7 @@ static int validate_expression(scope_object* object, node* expression) {
         return 0; // Literals are safe :D
 }
 
+// TODO: We're still missing lots of stuff here aren't we?
 static int validate_statement(binder_context* binder, scope_object* object, node* expression) {
     if(expression == NULL)
         return 0;
@@ -576,6 +579,8 @@ static int check_expressions(binder_context* binder, scope_object* object) {
 
 int binder_validate(binder_context* binder) {
 
+    // This is 100% the wrong way to do this, but it's the way I'm going to do it.
+
     // 1. Build the "program tree".
     scope_object* root_scope = new_scope_object(binder, SCOPE_OBJECT_GLOBAL, NULL);
     root_scope->name = "__$binder_root_node";
@@ -583,10 +588,21 @@ int binder_validate(binder_context* binder) {
         scope_object* object = binder_build_global(binder, binder->program_nodes[i].root);
         object->name = binder->program_nodes[i].name;
         object->parent = root_scope;
-        object_list_push(binder, root_scope->children, object);
+
+        if(streq(object->name, "__$stdlib")) {
+            for (int j = 0; j < object->children->length; ++j) {
+                scope_object* child = object->children->objects[j];
+                child->parent = root_scope;
+                object_list_push(binder, root_scope->children, child);
+            }
+        } else {
+            object_list_push(binder, root_scope->children, object);
+        }
     }
 
+#ifndef DYNAMIC_STDLIB
     push_stdlib(binder, root_scope);
+#endif
 
     print_scope_object(root_scope);
 
@@ -602,6 +618,9 @@ int binder_validate(binder_context* binder) {
     }
 
     // 4. Type checks - Can we add a string and a long? Can we call .GetLength() on a void?
+    if(type_check(binder, root_scope)) {
+        return 1;
+    }
 
     return 0;
 }

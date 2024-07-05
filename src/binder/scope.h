@@ -43,5 +43,6 @@ typedef struct scope_object_list {
 void object_list_push(binder_context* binder, scope_object_list* list, scope_object* object);
 scope_object_list* new_scope_object_list(binder_context* binder);
 location scope_location(scope_object* object);
+scope_object* get_scope_child(scope_object* o, string name);
 
 void print_scope_object(scope_object* object);

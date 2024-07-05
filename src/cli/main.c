@@ -100,6 +100,8 @@ parser_context* parse_file(FILE* in) {
 
 int main() {
 
+    allow_error_print(1);
+
     bind_ext_resolver resolver = {};
     resolver.count_fetch = count_fetch;
     resolver.get_package = get_package;
@@ -118,11 +120,21 @@ int main() {
     parser_context* test_external = parse_file(in);
     fclose(in);
 
+#ifdef DYNAMIC_STDLIB
+    lprintf("Parsing stdlib.rct\n");
+    in = fopen("stdlib_h/stdlib.rct", "r");
+    parser_context* stdlib = parse_file(in);
+    fclose(in);
+#endif
+
 
     binder_context* binder = binder_create(resolver);
 
     binder_mount(binder, test_simple->node, "test_simple.rct");
     binder_mount(binder, test_external->node, "test_external.rct");
+#ifdef DYNAMIC_STDLIB
+    binder_mount(binder, stdlib->node, "__$stdlib");
+#endif
 
     if(binder_validate(binder)) {
         // error!

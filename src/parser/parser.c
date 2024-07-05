@@ -5,7 +5,7 @@
 #include "../errors/error.h"
 
 static node* parse_statement(parser_context* parser, int semicolon);
-static node* parse_expression(parser_context* parser);
+static node_expression* parse_expression(parser_context* parser);
 
 static void throw_invalid_token(token_t token) {
     if(token.data == NULL)
@@ -37,6 +37,10 @@ static token_t current(parser_context* parser) {
 }
 
 static int at(parser_context* parser, token_type_e type) {
+    if(current(parser).type == TOKEN_EOF) {
+        fprintf(stderr, "Reached EOF!\n");
+        exit(-1);
+    }
     return current(parser).type == type;
 }
 
@@ -608,7 +612,7 @@ static node_if* parse_if(parser_context* parser) {
 
 }
 
-static node* parse_expression(parser_context* parser) {
+static node_expression* parse_expression(parser_context* parser) {
     int parser_old_location = parser->token_current;
 
     if(at(parser, TOKEN_ID)) {

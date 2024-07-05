@@ -345,6 +345,34 @@ static void lex_numeric(lexer_context* context) {
     push_token(context, token);
 }
 
+void lex_preprocessor(lexer_context* context) {
+    // For now, we read 'til the end.
+    int did_break = 0;
+    while (1) {
+        step(context, 1);
+        if(current(context) == '\\')
+            did_break = 1;
+        else if(current(context) == '\n' && !did_break)
+            break;
+        else if(current(context) == EOF)
+            break;
+        else
+            did_break = 0;
+    }
+}
+
+void lex_comment_big(lexer_context* context) {
+    step(context, 2);
+    while (current(context) != '*' || peek(context, 1) != '/') {
+
+        if(current(context) == EOF) return;
+
+        if(current(context) == '/' && peek(context, 1) == '*') lex_comment_big(context);
+        step(context, 1);
+    }
+    step(context, 2);
+}
+
 // Characters we don't care about, such as whitespace
 #define CASE_SKIP(_char) if(current(context)  == _char) { step(context, 1); continue; }
 // Single-character tokens
@@ -361,9 +389,13 @@ void lexer_process(lexer_context* context) {
             continue;
         }
 
+        if(current(context) == '#') {
+            lex_preprocessor(context);
+            continue;
+        }
+
         if(current(context) == '/' && peek(context, 1) == '*') {
-            while (!(current(context) == '*' && peek(context, 1) == '/')) step(context, 1);
-            step(context, 2);
+            lex_comment_big(context);
             continue;
         }
 
@@ -419,7 +451,7 @@ void lexer_process(lexer_context* context) {
         if(current(context) == '.') { lex_numeric(context); continue; }
         // For now, we just get mad :)
         step(context, 1);
-        error_throw("RCT1010", context->loc, "Invalid token %2X(%c)", current(context), current(context));
+        error_throw("RCT1010", context->loc, "Invalid character %2X(%c)", current(context), current(context));
     }
     push_empty_token(context, TOKEN_EOF);
 }

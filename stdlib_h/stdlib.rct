@@ -1,0 +1,13 @@
+// The NRC global types go here
+
+set class ref {
+
+}
+
+set class string {
+    set extern function GetLength() -> int;
+    set extern function IsEmpty() -> bool;
+}
+
+struct int { }
+struct bool { }
