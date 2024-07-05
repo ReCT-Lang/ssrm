@@ -1,6 +1,7 @@
 #pragma once
 
 #include "binder.h"
+#include <util/types.h>
 #include "ext.h"
 
 // There are a number of different scope properties:
@@ -23,6 +24,8 @@ const char* get_scope_name(scope_object_type t);
 
 typedef struct scope_object_list scope_object_list;
 typedef struct scope_object scope_object;
+typedef struct binder_context binder_context;
+typedef struct node node;
 
 typedef struct scope_object {
     scope_object_type object_type;

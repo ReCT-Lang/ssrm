@@ -1,7 +1,7 @@
 # Expression nodes
 
 begin abstract node_expression : node
-
+    function evaluate_type -> scope_object*
 end
 
 begin node_unary_exp : node_expression

@@ -3,6 +3,8 @@
 #include <parser/nodes.h>
 #include <memstack.h>
 
+typedef struct node_root node_root;
+
 typedef struct binder_bound_program {
     node_root* root;
     char* name;

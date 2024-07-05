@@ -95,9 +95,11 @@ output_file.write('''// Auto-generated from nodes.tscm and nodes.hgen.py
 #include "parser.h"
 #include <lexer/location.h>
 #include <util/log.h>
+#include <util/types.h>
+#include <binder/scope.h>
 
-typedef char* string;
 typedef struct parser_context parser_context;
+typedef struct scope_object scope_object;
 
 typedef enum permissions {
     PERMS_PUBLIC = 1,
@@ -265,6 +267,8 @@ for t in type_table.keys():
         output_file.write("void print_" + t + "(" + t + "* node, const char* name, int indent);\n");
 output_file.write("\n\n")
 
+abstracts = []
+
 for t in type_table.keys():
     # Generate node type functions such as print & new
     output_file.write(t + "* new_" + t + "(parser_context* parser) {\n")
@@ -321,7 +325,9 @@ for t in type_table.keys():
             output_file.write("\tswitch (n->type) {\n")
             for it in type_table.values():
                 if it.does_inherit(t):
+                    abstracts.append(type_table[t].functions[f] + " " + t + "_" + f + "_" + it.name + "(" + it.name + "* n) {}")
                     output_file.write("\t\tcase " + it.name.upper() + ":\n\t\t\treturn " + t + "_" + f + "_" + it.name + "(as_" + it.name + "((node*)n));\n")
+
             output_file.write("\t}\n")
             output_file.write("}\n\n")
 
@@ -361,6 +367,13 @@ output_file.write('''
 
 #endif
 #endif
+/* NEEDED FUNCTION OVERRIDES:
+
 ''')
+
+for a in abstracts:
+    output_file.write(a + "\n")
+
+output_file.write("\n*/")
 
 output_file.close()
