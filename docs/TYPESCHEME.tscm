@@ -40,9 +40,9 @@ END
 # - Keywords(BEGIN/END/VARIABLE/FUNCTION/ABSTRACT/INCLUDE) are CASE-INSENSITIVE. We usually use lower-case.
 # - A couple symbols(most notably the "->" arrows and the ":" things) are not actually cared for,
 #    so you can do this:
-BEGIN other_inheriting_class skifjeiofjeiowfjiowefj my_abstract_type
+bEgIn other_inheriting_class skifjeiofjeiowfjiowefj my_abstract_type
 
-END
+EnD
 # and it's perfectly good syntax. Not readable tho.
 
 # Hope you enjoy working with this... thing?
