@@ -1,0 +1,48 @@
+# This file is like the TypeScheme documentation.
+# It contains examples of how to do things.
+# These lines with hashtags are comments(like in Python)
+
+# We can include other tscm files(no spaces sadly)
+INCLUDE some/other/file.tscm
+
+# We define a class called "my_class"
+# It has a variable, "some_variable", with type "string".
+# The variable types are not standard. But we use C ones(exception of "string", which is a typedef'd "char*")
+BEGIN my_class
+    VARIABLE some_variable -> string
+END
+
+# We define an abstract class called my_abstract_class.
+# It has a variable named some_variable of type "int"
+# It also has a function(functions don't take args rn).
+# This function will be exported into C as "void my_abstract_class_some_function(my_abstract_class*);"
+# Any inheriting class will have to implement "__impl_my_abstract_class_some_function_[class_name]".
+# Invoking my_abstract_class_some_function will call the correct implementation.
+# It's messy but it works.
+BEGIN ABSTRACT my_abstract_class
+    VARIABLE some_variable -> int
+    FUNCTION some_function -> void
+END
+
+# Now we have the class my_inheriting_class
+# It inherits my_abstract_type, and will therefore have the variable "some_variable" available.
+# It will also have the method __impl_my_abstract_class_some_function_my_inheriting_class(my_inheriting_class*), which
+# you must implement in C.
+# Do not call __impl_my_abstract_class_some_function_my_inheriting_class by hand, instead call
+# my_abstract_class_some_function and pass in a pointer to a "my_inheriting_class"
+BEGIN my_inheriting_class : my_abstract_type
+
+END
+
+# That covers most of the language.
+# There are however some kinks:
+# - It splits everything at newlines and whitespaces. So avoid whitespaces hehe.
+# - Keywords(BEGIN/END/VARIABLE/FUNCTION/ABSTRACT/INCLUDE) are CASE-INSENSITIVE. We usually use lower-case.
+# - A couple symbols(most notably the "->" arrows and the ":" things) are not actually cared for,
+#    so you can do this:
+BEGIN other_inheriting_class skifjeiofjeiowfjiowefj my_abstract_type
+
+END
+# and it's perfectly good syntax. Not readable tho.
+
+# Hope you enjoy working with this... thing?
