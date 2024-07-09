@@ -5,14 +5,14 @@ end
 begin node_assignation : node
   variable operator -> operators
   variable target -> node_identifier
-  variable value -> node
+  variable value -> node_expression
 end
 
 begin node_variable_def : node
   variable name -> string
   variable flags -> permissions
   variable value_type -> node_identifier
-  variable default_value -> node
+  variable default_value -> node_expression
 end
 
 begin node_package_def : node

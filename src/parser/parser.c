@@ -418,9 +418,9 @@ static node_function_call* parse_function_call(parser_context* parser, node_iden
 
     if(!at(parser, TOKEN_PARENTHESIS_CLOSE)) {
         while (1) {
-            node *value = parse_expression(parser);
+            node_expression *value = parse_expression(parser);
             if (value != NULL)
-                list_push(parser, call->parameters, value);
+                list_push(parser, call->parameters, (node*)value);
             if (!at(parser, TOKEN_COMMA))
                 break;
             consume(parser, TOKEN_COMMA);
@@ -442,27 +442,27 @@ static node* parse_name_or_call(parser_context* parser) {
 
 }
 
-static node* parse_parenthesis_expression(parser_context* parser) {
+static node_expression* parse_parenthesis_expression(parser_context* parser) {
     consume(parser, TOKEN_PARENTHESIS_OPEN);
-    node* value = parse_expression(parser);
+    node_expression* value = parse_expression(parser);
     consume(parser, TOKEN_PARENTHESIS_CLOSE);
     return value;
 }
 
 // Parser one of the sides in an expression.
-static node* parse_primary_expression(parser_context* parser) {
+static node_expression * parse_primary_expression(parser_context* parser) {
     if(at(parser, TOKEN_STRING))
-        return (node*)parse_literal(parser);
+        return (node_expression*)parse_literal(parser);
     if(at(parser, TOKEN_NUMERIC))
-        return (node*)parse_literal(parser);
+        return (node_expression*)parse_literal(parser);
 
     if(at(parser, TOKEN_TRUE))
-        return (node*)parse_literal(parser);
+        return (node_expression*)parse_literal(parser);
     if(at(parser, TOKEN_FALSE))
-        return (node*)parse_literal(parser);
+        return (node_expression*)parse_literal(parser);
 
     if(at(parser, TOKEN_ID))
-        return (node*)parse_name_or_call(parser);
+        return (node_expression*)parse_name_or_call(parser);
 
     if(at(parser, TOKEN_PARENTHESIS_OPEN))
         return parse_parenthesis_expression(parser);
@@ -473,18 +473,18 @@ static node* parse_primary_expression(parser_context* parser) {
 
 // Thanks to the rgoc project.
 // I have no clue how this works lol.
-static node* parse_binary_expression(parser_context* parser, int parent_precedence) {
-    node* left = NULL;
+static node_expression * parse_binary_expression(parser_context* parser, int parent_precedence) {
+    node_expression* left = NULL;
 
     int unary_precedence = unary_op_precedence(current(parser).type);
     if(unary_precedence != 0 && unary_precedence > parent_precedence) {
         token_type_e operator = consume(parser, current(parser).type).type;
-        node* operand = parse_binary_expression(parser, unary_precedence);
+        node_expression* operand = parse_binary_expression(parser, unary_precedence);
 
         node_unary_exp* unary = new_node_unary_exp(parser);
         unary->operator = get_operator(operator);
-        unary->operand = operand;
-        return (node*)unary;
+        unary->operand = (node*)operand;
+        return (node_expression*)unary;
     } else {
         left = parse_primary_expression(parser);
 
@@ -503,17 +503,17 @@ static node* parse_binary_expression(parser_context* parser, int parent_preceden
         operators operator = get_operator(current(parser).type);
         step(parser, 1);
 
-        node* right = parse_binary_expression(parser, precedence);
+        node_expression* right = parse_binary_expression(parser, precedence);
 
         node_binary_exp* binary = new_node_binary_exp(parser);
         binary->operator = operator;
         binary->left = left;
         binary->right = right;
 
-        left = (node*)binary;
+        left = (node_expression*)binary;
     }
 
-    return left;
+    return (node_expression*)left;
 }
 
 static node_make* parse_make(parser_context* parser) {
@@ -525,9 +525,9 @@ static node_make* parse_make(parser_context* parser) {
     consume(parser, TOKEN_PARENTHESIS_OPEN);
     if(!at(parser, TOKEN_PARENTHESIS_CLOSE)) {
         while (1) {
-            node *value = parse_expression(parser);
+            node_expression *value = parse_expression(parser);
             if (value != NULL)
-                list_push(parser, make->parameters, value);
+                list_push(parser, make->parameters, (node*)value);
             if (!at(parser, TOKEN_COMMA))
                 break;
             consume(parser, TOKEN_COMMA);
@@ -619,6 +619,8 @@ static node_expression* parse_expression(parser_context* parser) {
         // We're doing something with accessors
         node_identifier* id = parse_identifier(parser);
 
+        // TODO: node_assignation is not an expression node.
+        //   This is prolly not correct haha. Try to move it?
         // If we're trying to assign something
         if(is_assign(current(parser).type)) {
             operators operator = OP_NONE;
@@ -628,7 +630,7 @@ static node_expression* parse_expression(parser_context* parser) {
             assignation->target = id;
             assignation->value = parse_expression(parser);
 
-            return (node*)assignation;
+            return (node_expression*)assignation;
         }
         if(is_single_op(current(parser).type)) {
             // i++ is the same as i <-+ 1
@@ -653,18 +655,18 @@ static node_expression* parse_expression(parser_context* parser) {
             node_assignation* assignation = new_node_assignation(parser);
             assignation->operator = operator;
             assignation->target = id;
-            assignation->value = (node*)literal;
-            return (node*)assignation;
+            assignation->value = (node_expression*)literal;
+            return (node_expression*)assignation;
         }
     }
 
     if(at(parser, TOKEN_KW_MAKE)) {
-        return (node*)parse_make(parser);
+        return (node_expression*)parse_make(parser);
     }
 
     parser->token_current = parser_old_location;
 
-    return parse_binary_expression(parser, 0);
+    return as_node_expression((node*)parse_binary_expression(parser, 0));
 }
 
 // Return and optionally consume a semicolon.

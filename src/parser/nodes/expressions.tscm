@@ -1,7 +1,6 @@
 # Expression nodes
 
 begin abstract node_expression : node
-    function evaluate_type -> scope_object*
 end
 
 begin node_unary_exp : node_expression
@@ -11,8 +10,8 @@ end
 
 begin node_binary_exp : node_expression
   variable operator -> operators
-  variable left -> node
-  variable right -> node
+  variable left -> node_expression
+  variable right -> node_expression
 end
 
 begin node_function_call : node_expression

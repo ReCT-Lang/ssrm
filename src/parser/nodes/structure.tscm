@@ -29,7 +29,7 @@ end
 begin node_parameter : node
   variable name -> string
   variable value_type -> node_identifier
-  variable default_value -> node
+  variable default_value -> node_expression
 end
 
 begin node_enum_def : node

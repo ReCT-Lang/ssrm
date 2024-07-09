@@ -88,7 +88,7 @@ void lexer_destroy(lexer_context* context) {
 }
 
 static int look_ahead_equals(lexer_context* context, const char* str) {
-    unsigned long length = strlen(str);
+    int length = (int)strlen(str);
     for (int i = 0; i < length; ++i) {
         int at = peek(context, i);
         if(at != str[i])

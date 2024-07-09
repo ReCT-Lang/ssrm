@@ -1,7 +1,7 @@
 #include <lexer/lexer.h>
 #include <parser/parser.h>
 #include <errors/error.h>
-#include <binder/binder.h>
+//#include <binder/binder.h>
 #include <string.h>
 #include <stdlib.h>
 #include "util/log.h"
@@ -19,6 +19,8 @@ void throw_exceptions() {
     if(error_count > 0)
         exit(1);
 }
+
+/*
 typedef struct obj obj;
 
 typedef struct obj {
@@ -70,6 +72,7 @@ bind_ext_object get_package(char* name) {
     lprintf("Invalid package '%s!'\n", name);
     return 0;
 }
+ */
 
 parser_context* parse_file(FILE* in) {
     lexer_context* lexer = lexer_create();
@@ -102,6 +105,7 @@ int main() {
 
     allow_error_print(1);
 
+    /*
     bind_ext_resolver resolver = {};
     resolver.count_fetch = count_fetch;
     resolver.get_package = get_package;
@@ -109,6 +113,7 @@ int main() {
     resolver.level_fetch = level_fetch;
     resolver.object_fetch = object_fetch;
     resolver.value_fetch = value_fetch;
+    */
 
     lprintf("Parsing test_simple.rct\n");
     FILE* in = fopen("src/r_test/test_simple.rct", "r");
@@ -126,7 +131,7 @@ int main() {
     parser_context* stdlib = parse_file(in);
     fclose(in);
 #endif
-
+/*
 
     binder_context* binder = binder_create(resolver);
 
@@ -142,6 +147,27 @@ int main() {
     }
 
     binder_destroy(binder);
+    */
+
+    binder_context* binder = binder_create();
+    built_file test_simple_built = binder_build_file(binder, test_simple);
+    built_file test_external_built = binder_build_file(binder, test_external);
+    built_file stdlib_built = binder_build_file(binder, stdlib);
+
+    lprintf("test_simple.rct bind tree:\n");
+    for (size_t i = 0; i < test_simple_built->size; ++i) {
+        print_scope_object(test_simple_built->objects[i], 1);
+    }
+
+    lprintf("test_external.rct bind tree:\n");
+    for (size_t i = 0; i < test_external_built->size; ++i) {
+        print_scope_object(test_external_built->objects[i], 1);
+    }
+
+    lprintf("stdlib bind tree:\n");
+    for (size_t i = 0; i < stdlib_built->size; ++i) {
+        print_scope_object(stdlib_built->objects[i], 1);
+    }
 
     parser_destroy(test_simple);
     parser_destroy(test_external);
