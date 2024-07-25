@@ -58,7 +58,7 @@ void error_throw(error_code code, location loc, const char* fmt, ...) {
     error e = {.code = code, .loc = loc, .string = error_msg};
 
     if(print_errors)
-        fprintf(stderr, "[ERR] [L: %u, C: %u] %s: %s\n", e.loc.line, e.loc.column, e.code, e.string);
+        print_error(stderr, e);
 
     // We push everything to a linked list for ease.
     if(root_node == NULL) {
@@ -77,4 +77,8 @@ void error_throw(error_code code, location loc, const char* fmt, ...) {
 
 void allow_error_print(int enabled) {
     print_errors = enabled ? 1 : 0;
+}
+
+void print_error(FILE* file, error e) {
+    fprintf(file, "[ERR] [%s: L: %u, C: %u] %s: %s\n", e.loc.context->path, e.loc.line, e.loc.column, e.code, e.string);
 }

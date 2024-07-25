@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "util/log.h"
+#include <binder/library_resolver.h>
 
 void throw_exceptions() {
     int error_count = enumerate_errors(NULL);
@@ -13,7 +14,8 @@ void throw_exceptions() {
 
     for (int i = 0; i < error_count; ++i) {
         error e = errors[i];
-        fprintf(stderr, "[ERR] [L: %u, C: %u] %s: %s\n", e.loc.line, e.loc.column, e.code, e.string);
+        print_error(stderr, e);
+        //fprintf(stderr, "[ERR] [%s: L: %u, C: %u] %s: %s\n", e.loc.context->path, e.loc.line, e.loc.column, e.code, e.string);
     }
     free(errors);
     if(error_count > 0)
@@ -74,8 +76,8 @@ bind_ext_object get_package(char* name) {
 }
  */
 
-parser_context* parse_file(FILE* in) {
-    lexer_context* lexer = lexer_create();
+parser_context* parse_file(FILE* in, file_context* file) {
+    lexer_context* lexer = lexer_create(file);
     lexer_read(lexer, in);
 
     lexer_process(lexer);
@@ -103,7 +105,7 @@ parser_context* parse_file(FILE* in) {
 
 int main() {
 
-    allow_error_print(1);
+    allow_error_print(0);
 
     /*
     bind_ext_resolver resolver = {};
@@ -117,18 +119,21 @@ int main() {
 
     lprintf("Parsing test_simple.rct\n");
     FILE* in = fopen("src/r_test/test_simple.rct", "r");
-    parser_context* test_simple = parse_file(in);
+    file_context* test_simple_f = create_file_context("test_simple.rct");
+    parser_context* test_simple = parse_file(in, test_simple_f);
     fclose(in);
 
     lprintf("Parsing test_external.rct\n");
+    file_context* test_external_f = create_file_context("test_external.rct");
     in = fopen("src/r_test/test_external.rct", "r");
-    parser_context* test_external = parse_file(in);
+    parser_context* test_external = parse_file(in, test_external_f);
     fclose(in);
 
 #ifdef DYNAMIC_STDLIB
     lprintf("Parsing stdlib.rct\n");
     in = fopen("stdlib_h/stdlib.rct", "r");
-    parser_context* stdlib = parse_file(in);
+    file_context* stdlib_f = create_file_context("stdlib.rct");
+    parser_context* stdlib = parse_file(in, stdlib_f);
     fclose(in);
 #endif
 /*
@@ -168,6 +173,12 @@ int main() {
     for (size_t i = 0; i < stdlib_built->size; ++i) {
         print_scope_object(stdlib_built->objects[i], 1);
     }
+
+    built_file project_files[] = {
+            test_external_built, stdlib_built
+    };
+
+    binder_bind_identifiers(binder, test_simple_built, 2, project_files);
 
     parser_destroy(test_simple);
     parser_destroy(test_external);

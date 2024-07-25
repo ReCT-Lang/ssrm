@@ -1,5 +1,6 @@
 #pragma once
 #include "../lexer/location.h"
+#include "error_index.h"
 
 typedef const char* error_code;
 
@@ -21,3 +22,5 @@ void free_error(error err);
 
 // Delete currently stored errors
 void dispose_errors();
+
+void print_error(FILE* file, error error);

@@ -9,9 +9,9 @@ static node_expression* parse_expression(parser_context* parser);
 
 static void throw_invalid_token(token_t token) {
     if(token.data == NULL)
-        error_throw("RCT2001", token.loc, "Unexpected token %s", TOKEN_NAMES[token.type]);
+        error_throw(ERR_TOKEN_UNEXPECTED, token.loc, "Unexpected token %s", TOKEN_NAMES[token.type]);
     else
-        error_throw("RCT2001", token.loc, "Unexpected token %s (%s)", token.data, TOKEN_NAMES[token.type]);
+        error_throw(ERR_TOKEN_UNEXPECTED, token.loc, "Unexpected token %s (%s)", token.data, TOKEN_NAMES[token.type]);
 }
 
 void* palloc(parser_context* context, int size) {
@@ -52,7 +52,7 @@ static token_t consume(parser_context* parser, token_type_e type) {
     token_t c = current(parser);
     step(parser, 1);
     if(c.type != type) {
-        error_throw("RCT2002", current(parser).loc, "Unexpected token %s, expected %s",
+        error_throw(ERR_TOKEN_UNEXPECTED_B, current(parser).loc, "Unexpected token %s, expected %s",
                     TOKEN_NAMES[c.type], TOKEN_NAMES[type]);
     }
     return c;
@@ -60,8 +60,9 @@ static token_t consume(parser_context* parser, token_type_e type) {
 
 
 parser_context* parser_create(lexer_context* lexer) {
-    parser_context* context = (parser_context*)malloc(sizeof(parser_context));
-    context->allocation_stack = msnew();
+    parser_context* context = f_alloc(lexer->file, parser_context);
+    context->file = lexer->file;
+    context->allocation_stack = context->file->alloc_stack;
     context->lexer = lexer;
     context->token_current = 0;
 
@@ -69,8 +70,7 @@ parser_context* parser_create(lexer_context* lexer) {
 }
 
 void parser_destroy(parser_context* parser) {
-    msfree(parser->allocation_stack);
-    free(parser);
+
 }
 
 static int unary_op_precedence(token_type_e type) {
@@ -710,6 +710,7 @@ node* parse_statement(parser_context* parser, int semicolon) {
 void parser_parse(parser_context* parser) {
     node_root* root_node = new_node_root(parser);
     parser->node = root_node;
+    root_node->file = parser->file->path;
 
     while(current(parser).type != TOKEN_EOF) {
         node* n = parse_statement(parser, 1);

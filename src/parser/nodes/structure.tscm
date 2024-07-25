@@ -3,6 +3,7 @@
 
 begin node_root : node
   variable children -> node_list
+  variable file -> string
 end
 
 begin node_class_def : node

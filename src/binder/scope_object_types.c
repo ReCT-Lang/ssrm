@@ -10,9 +10,11 @@ const string SCOPE_OBJECT_TYPES[6] = {
         "SCOPE_OBJECT_PACKAGE"
 };
 
-const string SCOPE_OBJECT_ACCESSES[4] = {
-        "ACCESS_PUBLIC",
-        "ACCESS_PRIVATE",
-        "ACCESS_STATIC",
-        "ACCESS_INSTANCE"
+const string SCOPE_OBJECT_TYPES_LEG[6] = {
+        "null",
+        "class",
+        "function",
+        "variable",
+        "struct",
+        "package"
 };

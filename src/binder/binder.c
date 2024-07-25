@@ -11,10 +11,15 @@ binder_context* binder_create() {
 
     binder_context* binder = (binder_context*) msalloc(binder_stack, sizeof(binder_context));
     binder->stack = binder_stack;
+    binder->resolver = NULL;
 
     return binder;
 }
 
 void binder_destroy(binder_context* binder) {
     msfree(binder->stack);
+}
+
+void binder_set_resolver(binder_context* binder, library_resolver resolver) {
+    binder->resolver = resolver;
 }

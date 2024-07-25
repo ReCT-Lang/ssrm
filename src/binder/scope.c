@@ -1,6 +1,7 @@
 #include "scope.h"
 #include "stdio.h"
 #include <util/log.h>
+#include <string.h>
 #include "stdlib.h"
 
 
@@ -84,7 +85,22 @@ void print_scope_object(scope_object* object, int depth) {
     int has_children = object->object_type == SCOPE_OBJECT_PACKAGE ||
                        object->object_type == SCOPE_OBJECT_STRUCT ||
                        object->object_type == SCOPE_OBJECT_CLASS;
-    log_i(depth, "%s %s: %s\n", SCOPE_OBJECT_ACCESSES[object->object_type], SCOPE_OBJECT_TYPES[object->object_type], object->name)
+
+    char access_string[2048] = {0};
+    if (object->access & ACCESS_PRIVATE) {
+        sprintf(access_string + strlen(access_string), "private ");
+    }
+    if (object->access & ACCESS_PUBLIC) {
+        sprintf(access_string + strlen(access_string), "public ");
+    }
+    if (object->access & ACCESS_INSTANCE) {
+        sprintf(access_string + strlen(access_string), "instance ");
+    }
+    if (object->access & ACCESS_STATIC) {
+        sprintf(access_string + strlen(access_string), "static ");
+    }
+
+    log_i(depth, "%s%s %s\n", access_string, SCOPE_OBJECT_TYPES_LEG[object->object_type], object->name)
     if(has_children) {
         // Structs, packages and classes look the same at the raw binary level,
         // so we can safely cast to class without any worries.

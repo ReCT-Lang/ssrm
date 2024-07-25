@@ -3,6 +3,7 @@
 #include "token.h"
 #include <string.h>
 #include "../errors/error.h"
+#include <errno.h>
 
 static int streq(char* a, char* b) {
     int a_len = strlen(a);
@@ -69,22 +70,21 @@ static void push_empty_token(lexer_context* lexer, token_type_e type) {
 }
 
 // Initialize a lexer context
-lexer_context* lexer_create() {
-    lexer_context* lexer = (lexer_context*)malloc(sizeof(lexer_context));
+lexer_context* lexer_create(file_context* file) {
+    lexer_context* lexer = f_alloc(file, lexer_context);
     lexer->token_count = 0;
+    lexer->data_length = 0;
+    lexer->data = NULL;
     lexer->tokens_allocated = 0;
     lexer->tokens = NULL;
-    lexer->loc = (location){1, 1};
+    lexer->loc = (location){file, 1, 1};
+    lexer->file = file;
     return lexer;
 }
 
 // Delete a lexer context
 void lexer_destroy(lexer_context* context) {
-    for (int i = 0; i < context->token_count; ++i) {
-        free(context->tokens[i].data);
-    }
-
-    free(context);
+    // Do nothing. It's the file responsibility now hehe :D
 }
 
 static int look_ahead_equals(lexer_context* context, const char* str) {
@@ -129,12 +129,12 @@ static void lex_string(lexer_context* context) {
         int c = current(context);
         if(c == EOF) {
             free(read_buffer);
-            error_throw("RCT1011", context->loc, "Unexpected EOF");
+            error_throw(ERR_UNEXPECTED_EOF, context->loc, "Unexpected EOF");
             return;
         }
         if(c == '\n') {
             free(read_buffer);
-            error_throw("RCT1011", context->loc, "Unexpected newline");
+            error_throw(ERR_UNEXPECTED_NL, context->loc, "Unexpected newline");
             return;
         }
         if(c == '"') break;
@@ -451,7 +451,7 @@ void lexer_process(lexer_context* context) {
         if(current(context) == '.') { lex_numeric(context); continue; }
         // For now, we just get mad :)
         step(context, 1);
-        error_throw("RCT1010", context->loc, "Invalid character %2X(%c)", current(context), current(context));
+        error_throw(ERR_INVALID_CHAR, context->loc, "Invalid character %2X(%c)", current(context), current(context));
     }
     push_empty_token(context, TOKEN_EOF);
 }
@@ -463,8 +463,13 @@ void lexer_read(lexer_context* lexer, FILE* file) {
     fseek(file, pos, SEEK_SET);
 
     void* new_buffer = realloc(lexer->data, lexer->data_length + size);
-    if(new_buffer == NULL)
+    if(new_buffer == NULL) {
+        if(lexer->data == NULL) {
+            fprintf(stderr, "realloc threw '%s'(%i) on realloc to %lu\n", strerror(errno), errno, lexer->data_length + size);
+            exit(errno);
+        }
         return;
+    }
 
     lexer->data = new_buffer;
     fread(lexer->data + lexer->data_length, sizeof(char), size, file);
