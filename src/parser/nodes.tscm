@@ -15,4 +15,5 @@ begin node_identifier : node
   variable package -> int
   variable child -> node_identifier
   variable generic_values -> node_list
+  variable bound_object -> scope_object*
 end

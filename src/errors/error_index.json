@@ -1,0 +1,22 @@
+{
+  "$ This is a comment!":[],
+
+  "$ 0 - Internal errors":[],
+  "RCT0000": ["ERR_UNKNOWN", "Something went wrong within nrc! Report!"],
+  "RCT0300": ["ERR_RESOLVER_MISSING", "The binder could not find a package resolver!"],
+
+  "$ 1 - Lexer errors":[],
+  "RCT1010": ["ERR_INVALID_CHAR", "An invalid character was found!"],
+  "RCT1011": ["ERR_UNEXPECTED_EOF", "An unexpected EOF was found!"],
+  "RCT1012": ["ERR_UNEXPECTED_NL", "An unexpected newline was found!"],
+
+  "$ 2 - Parser errors":[],
+  "RCT2001": ["ERR_TOKEN_UNEXPECTED", "An unexpected token was found!"],
+  "RCT2002": ["ERR_TOKEN_UNEXPECTED_B", "A token other than what was expected was found!"],
+
+  "$ 3 - Binder errors":[],
+  "RCT3001": ["ERR_NODE_UNEXPECTED", "An unexpected node was found!"],
+  "RCT3002": ["ERR_DECL_DISALLOWED", "A declaration was not allowed within the current block!"],
+  "RCT3010": ["ERR_ACCESS_DUALITY", "A declaration cannot be public and private at the same time!"],
+  "RCT3020": ["ERR_PACKAGE_NOTFOUND", "A package couldn't be found!"]
+}

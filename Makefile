@@ -21,6 +21,7 @@
 # 	MODS - All the source directories(under src)
 #	CPY - All ".cgen.py" files, which are python scripts that generate C code
 #	HPY - All ".hgen.py" files, which are python scripts that generate C headers
+#	GEN - All the generated C files and headers.
 # 	SRC - All the files that should be compiled
 # 	HDR - All the header files in the project
 #	DEPS - Auto-generated C dependencies
@@ -44,22 +45,30 @@
 #	all - Build everything(binary)
 #	run - Builds and runs the project
 #	clean - Deletes the build directory
+#   generate - Runs all source generators
 #
 #		Special targets:
 #	%.c: %.cgen.py - Generates a C file from a C generator
 #	%.h: %.hgen.py - Generates a H file from a header generator
 
 EXE:=nrc
+LIB:=libnrc.so
 
-MODS:=/cli /lexer /util /parser /errors /binder
+MODS:=/lexer /util /parser /errors /binder
 
 CPY:=$(foreach mod,$(MODS),$(wildcard src$(mod)/*.cgen.py))
 HPY:=$(foreach mod,$(MODS),$(wildcard src$(mod)/*.hgen.py))
+GEN:=$(patsubst %.cgen.py,%.c,$(CPY)) $(patsubst %.hgen.py,%.h,$(HPY))
 
 SRC:=$(foreach mod,$(MODS),$(wildcard src$(mod)/*.c)) $(patsubst %.cgen.py,%.c,$(CPY)) memstack/src/memstack.c
 HDR:=$(foreach mod,$(MODS),$(wildcard src$(mod)/*.h)) $(patsubst %.hgen.py,%.h,$(HPY)) memstack/include/memstack.c
 RCT:=$(wildcard src/r_test/*.rct)
 OBJ:=$(patsubst %.c,%.o,$(SRC))
+
+# CLI stuff
+SRC_CLI:=$(wildcard src/cli/*.c)
+HDR_CLI:=$(wildcard src/cli/*.c)
+OBJ_CLI:=$(patsubst %.c,%.o,$(SRC_CLI))
 
 # Valid flags:
 # - NRC_JOKES - Allows some non-spec features
@@ -75,9 +84,13 @@ CC:=gcc
 LD:=gcc
 PY:=python
 
-CCFLAGS:=-g -Imemstack/include -Isrc -D DYNAMIC_STDLIB
-LDFLAGS:=-g
+CCFLAGS:=-g -Imemstack/include -Isrc -D DYNAMIC_STDLIB -Wall -Wextra -fPIC
+LDFLAGS:=-g -shared -fPIC
 LIBRARY:=
+
+CCFLAGS_CLI:=-g -Imemstack/include -Isrc -D DYNAMIC_STDLIB -Wall -Wextra
+LDFLAGS_CLI:=-g -Wl,-rpath,. # We have to specify rpath so it searches for libnrc.so in the current dir as well :D
+LIBRARY_CLI:=-L./ -lnrc
 
 -include $(DEPS)
 
@@ -93,22 +106,33 @@ $(BIN):
 	$(info [PY] GENERATING $< => $@)
 	@cd "$(dir $<)" && $(PY) $(notdir $<)
 
-%.o: %.c
+%.o: %.c generate
 	$(info [CC] BUILDING $< => $@)
 	@$(CC) $(CCFLAGS) $(foreach flag,$(FLAGS),-D$(flag)) -MMD -MP -c $< -o $@
 
+src/cli/%.o: src/cli/%.c generate
+	$(info [CC] BUILDING CLI $< => $@)
+	@$(CC) $(CCFLAGS_CLI) $(foreach flag,$(FLAGS),-D$(flag)) -MMD -MP -c $< -o $@
+
 obj: $(OBJ)
+obj_cli: $(OBJ_CLI)
 
-binary: obj
-	$(info [LD] LINKING $(OBJ) => $(EXE))
-	@$(LD) $(LDFLAGS) $(OBJ) -o $(EXE) $(LIBRARY)
+library: obj
+	$(info [LD] LINKING $(OBJ) => $(LIB))
+	@$(LD) $(LDFLAGS) $(OBJ) -o $(LIB) $(LIBRARY)
 
-all: binary $(B_RCT)
+cli: obj_cli library
+	$(info [LD] LINKING $(OBJ_CLI) => $(EXE))
+	$(LD) $(LDFLAGS_CLI) $(OBJ_CLI) -o $(EXE) $(LIBRARY_CLI)
+
+all: library cli $(B_RCT)
 
 run: all
 	./$(EXE)
 
 clean:
-	$(RM) $(BIN) $(OBJ) $(SRC:.c=.d)
+	$(RM) $(BIN) $(OBJ) $(OBJ_CLI) $(SRC:.c=.d) $(GEN)
 
-.PHONY: clean, run, all, binary, obj
+generate: $(GEN)
+
+.PHONY: clean, run, all, binary, obj, generate

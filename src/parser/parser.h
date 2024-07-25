@@ -12,6 +12,7 @@ typedef struct parser_context {
     node_root* node;
     lexer_context* lexer;
     int token_current;
+    file_context* file;
 } parser_context;
 
 parser_context* parser_create(lexer_context* lexer);

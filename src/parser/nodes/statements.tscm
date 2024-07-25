@@ -1,24 +1,28 @@
-begin node_return : node
+begin abstract node_statement : node
+
+end
+
+begin node_return : node_statement
   variable value -> node_expression
 end
 
-begin node_assignation : node
+begin node_assignation : node_statement
   variable operator -> operators
   variable target -> node_identifier
-  variable value -> node
+  variable value -> node_expression
 end
 
-begin node_variable_def : node
+begin node_variable_def : node_statement
   variable name -> string
   variable flags -> permissions
   variable value_type -> node_identifier
-  variable default_value -> node
+  variable default_value -> node_expression
 end
 
-begin node_package_def : node
+begin node_package_def : node_statement
   variable package_name -> string
 end
 
-begin node_use_def : node
+begin node_use_def : node_statement
   variable package_name -> string
 end
